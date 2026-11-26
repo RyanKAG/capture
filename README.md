@@ -2,7 +2,7 @@
 
 Email a PNG of one application window at a regular interval or at chosen times of day. Run the script in the desktop session where the window is open.
 
-**Windows with classic Outlook:** [Download the Windows setup ZIP](downloads/windows-outlook-setup.zip). Extract it and follow the included README to set your window title, sending account, recipient, and schedule.
+**Using Windows and classic Outlook?** Start with the [Windows setup and verification guide](WINDOWS.md). It walks you through checking the window preview, sending one email to your recipient, and verifying two scheduled captures. The same guide is included in the [Windows setup ZIP](https://raw.githubusercontent.com/RyanKAG/capture/main/downloads/windows-outlook-setup.zip).
 
 ## Test the schedule on this Mac
 
@@ -37,19 +37,7 @@ If macOS asks, enable Terminal under **System Settings → Privacy & Security �
 
 Use x64 Python on Windows 11 or Windows 10 version 1903 or later. The commands below assume the Windows Python launcher (`py`) selects Python 3.12 or 3.13. [Windows capture API requirements](https://learn.microsoft.com/en-us/windows/win32/api/windows.graphics.capture.interop/nf-windows-graphics-capture-interop-igraphicscaptureiteminterop-createforwindow) · [Capture package for x64 Python](https://pypi.org/project/windows-capture/2.0.1/)
 
-Open **Outlook (classic)** and check that you can send from the account you plan to use. A Hotmail or Outlook.com account can send to a Gmail recipient. Open PowerShell in the folder containing `capture_email.py` and run the commands below for a one-shot test to the sending account's own inbox. To test a different recipient, follow the configuration steps below and use `--once`. Outlook may show a programmatic access prompt depending on its settings. [Compare Outlook versions](https://support.microsoft.com/en-us/outlook/getstarted/feature-comparison-between-new-outlook-and-classic-outlook)
-
-```powershell
-py -m pip install -r requirements.txt
-py capture_email.py --mail-app-test
-```
-
-### Automate Outlook on Windows
-
-1. Open the window you want to capture. In the project folder, run `py capture_email.py --list-windows` to find its exact title.
-2. Copy `config.example.ini` to `config.ini` if you are running from the source folder. The Windows setup ZIP already includes `config.ini`. Set `title`, `sender` (the address signed in to classic Outlook), and `recipients`. Keep `transport = mail_app`. Use `mode = interval` and `interval_minutes = 30` for a capture now and every half hour, or use `mode = daily` and `daily_times = 09:00, 17:30` for fixed local times.
-3. Run `py capture_email.py --once` and check that the intended inbox receives the PNG. If Outlook asks you to approve programmatic sending each time, your Outlook settings or organization policy require interaction for this method.
-4. Double-click `Start screenshot schedule.cmd` to run the schedule. Keep the Windows session unlocked, with the target window open and unminimized. Press Ctrl+C in the console to stop.
+Use `transport = mail_app` for delivery through your sending account in **Outlook (classic)**. A Hotmail or Outlook.com account can send directly to a Gmail recipient. Follow the [Windows guide](WINDOWS.md) for the configuration file, PowerShell commands, expected results, and troubleshooting.
 
 To restart the schedule automatically when you sign in, place a **shortcut** to `Start screenshot schedule.cmd` in your Windows Startup folder. Open that folder with **Win+R**, then enter `shell:startup`. Run one copy of the scheduler to avoid duplicate emails. Removing the shortcut turns off automatic startup. [Microsoft's Startup folder instructions](https://support.microsoft.com/en-us/windows/experience/startup-boot/configure-startup-applications-in-windows)
 
