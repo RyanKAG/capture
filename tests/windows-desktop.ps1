@@ -67,6 +67,33 @@ try {
     $check = $mail.GetMethod('CheckSdkAsync', $flags).Invoke($null, @())
     if (!$check.Wait(240000)) { throw 'Microsoft Graph SDK preparation timed out.' }
     Write-Output "Microsoft Graph authentication module imported: $($check.Result)"
+
+    # Exercise the same worker and message serialization against an offline Graph fixture.
+    $sdk = $mail.GetField('moduleDirectory', $flags)
+    $realModule = $sdk.GetValue($null)
+    $stub = New-Item -ItemType Directory -Path (Join-Path $isolated 'graph-fixture')
+    try {
+        Copy-Item (Join-Path $PSScriptRoot 'GraphFixture.psm1') $stub.FullName
+        New-ModuleManifest -Path (Join-Path $stub.FullName 'Microsoft.Graph.Authentication.psd1') -RootModule 'GraphFixture.psm1'
+        $sdk.SetValue($null, $stub.FullName)
+        $hash = [Security.Cryptography.SHA256]::Create()
+        try { $env:CAPTUREMAIL_TEST_PNG = [Convert]::ToBase64String($hash.ComputeHash([byte[]]$task.Result)) }
+        finally { $hash.Dispose() }
+        $login = $mail.GetMethod('ConnectAsync', $flags).Invoke($null, @())
+        if (!$login.Wait(60000) -or $login.Result -ne 'sender@example.invalid') { throw 'Offline account check failed.' }
+        $arguments = [object[]]::new(4)
+        $arguments[0] = $login.Result
+        $arguments[1] = 'recipient@example.invalid'
+        $arguments[2] = $title
+        $arguments[3] = [byte[]]$task.Result
+        $send = $mail.GetMethod('SendAsync', $flags).Invoke($null, $arguments)
+        if (!$send.Wait(30000)) { throw 'Offline email submission test timed out.' }
+        Write-Output 'Offline email test passed with the exact captured PNG and configured recipient.'
+    } finally {
+        $mail.GetMethod('StopWorker', $flags).Invoke($null, @())
+        $sdk.SetValue($null, $realModule)
+        Remove-Item Env:CAPTUREMAIL_TEST_PNG -ErrorAction SilentlyContinue
+    }
 } catch {
     $detail = $_.Exception.GetBaseException().Message
     Write-Output ("::error::" + $detail.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A'))
