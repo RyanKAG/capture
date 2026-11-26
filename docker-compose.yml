@@ -6,5 +6,10 @@ services:
       PORT: "8989"          # inside the container
     ports:
       - "8989:8989"         # reachable from other machines on port 8989
+    volumes:
+      - settings:/data      # settings saved from the web UI (no images are ever stored)
     restart: unless-stopped
-    read_only: true         # nothing can be written to disk; images are only held in memory
+    read_only: true         # the rest of the container can't be written to
+
+volumes:
+  settings:

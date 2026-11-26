@@ -28,9 +28,15 @@ JPEG = b"\xff\xd8\xff\xe0" + os.urandom(20_000)
 
 
 def multipart(fields):
+    """fields: {name: (filename, bytes)} for files, or {name: "text"} for plain form fields."""
     boundary = uuid.uuid4().hex
     out = b""
-    for name, (filename, data) in fields.items():
+    for name, value in fields.items():
+        if isinstance(value, str):
+            out += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n"
+                    f"{value}\r\n").encode()
+            continue
+        filename, data = value
         out += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"; "
                 f"filename=\"{filename}\"\r\nContent-Type: application/octet-stream\r\n\r\n").encode()
         out += data + b"\r\n"
@@ -39,14 +45,22 @@ def multipart(fields):
 
 
 class Base(unittest.TestCase):
+    extra_env = {}
+
     def setUp(self):
-        self.smtp = FakeSMTPServer()
+        import tempfile
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmpdir.cleanup)
+        self.smtp = FakeSMTPServer(creds=("user@example.com", "secret"))
         threading.Thread(target=self.smtp.serve_forever, daemon=True).start()
         self.api = server.make_server({
             "HOST": "127.0.0.1", "PORT": "0",
             "SMTP_HOST": "127.0.0.1", "SMTP_PORT": str(self.smtp.server_address[1]),
-            "SMTP_SECURITY": "none", "SMTP_USER": "user", "SMTP_PASS": "secret",
-            "MAIL_FROM": "api@example.com", "MAIL_TO": "me@example.com", "MAX_UPLOAD_MB": "1",
+            "SMTP_SECURITY": "none", "SMTP_USER": "user@example.com", "SMTP_PASS": "secret",
+            "MAIL_FROM": "api@example.com", "TRUSTED_SENDERS": "me@example.com, boss@example.com",
+            "MAX_UPLOAD_MB": "1",
+            "WATCH_EMAIL": "false", "SETTINGS_FILE": os.path.join(self.tmpdir.name, "settings.json"),
+            **self.extra_env,
         })
         self.api.retry_delay = 0
         threading.Thread(target=self.api.serve_forever, daemon=True).start()
@@ -57,13 +71,21 @@ class Base(unittest.TestCase):
             s.shutdown()
             s.server_close()
 
+    def emailed(self, i=0):
+        return email.message_from_bytes(self.smtp.received[i]["data"], policy=email.policy.default)
+
     def emailed_attachment(self, i=0):
-        msg = email.message_from_bytes(self.smtp.received[i]["data"], policy=email.policy.default)
-        return next(msg.iter_attachments())
+        return next(self.emailed(i).iter_attachments())
+
+    def request(self, to="me@example.com", subject="status", message_id="<req1@mail.gmail.com>"):
+        """Simulate a trusted 'status' email arriving; returns the request id."""
+        return self.api.trigger.fire(to, subject, message_id)
 
 
 class ServerTest(Base):
-    def post(self, fields, path="/send"):
+    def post(self, fields, path="/send", with_request=True):
+        if with_request and "requests" not in fields:
+            fields = {"requests": str(self.request()), **fields}
         ctype, body = multipart(fields)
         req = urllib.request.Request(self.url + path, data=body, method="POST",
                                      headers={"Content-Type": ctype})
@@ -82,6 +104,60 @@ class ServerTest(Base):
         self.assertEqual(att.get_content_type(), "image/png")
         self.assertEqual(att.get_content(), PNG)
         self.assertEqual(self.smtp.received[0]["to"], ["<me@example.com>"])
+
+    def test_reply_goes_only_to_requester_in_same_thread(self):
+        rid = self.request(to="boss@example.com", subject="Status", message_id="<abc@mail.gmail.com>")
+        status, body = self.post({"requests": str(rid), "client": "office-pc", "file": ("s.png", PNG)})
+        self.assertEqual(status, 200, body)
+        self.assertEqual(len(self.smtp.received), 1)
+        self.assertEqual(self.smtp.received[0]["to"], ["<boss@example.com>"])
+        msg = self.emailed()
+        self.assertEqual(msg["To"], "boss@example.com")
+        self.assertEqual(msg["Subject"], "Re: Status")
+        self.assertEqual(msg["In-Reply-To"], "<abc@mail.gmail.com>")
+        self.assertIn("office-pc", msg.get_body(("plain",)).get_content())
+
+    def test_upload_without_request_is_not_emailed(self):
+        status, body = self.post({"file": ("cat.png", PNG)}, with_request=False)
+        self.assertEqual(status, 400)
+        self.assertIn("no valid pending request", body["error"])
+        self.assertEqual(self.smtp.received, [])
+
+    def test_unknown_or_expired_request_is_not_emailed(self):
+        self.assertEqual(self.post({"requests": "999", "file": ("cat.png", PNG)})[0], 400)
+        rid = self.request()
+        self.api.trigger.requests[rid]["time"] -= server.REQUEST_TTL + 1
+        self.assertEqual(self.post({"requests": str(rid), "file": ("cat.png", PNG)})[0], 400)
+        self.assertEqual(self.smtp.received, [])
+
+    def test_two_requesters_each_get_their_own_email(self):
+        a = self.request(to="me@example.com")
+        b = self.request(to="boss@example.com")
+        status, body = self.post({"requests": f"{a},{b}", "file": ("cat.png", PNG)})
+        self.assertEqual(status, 200, body)
+        self.assertEqual(sorted(r["to"][0] for r in self.smtp.received),
+                         ["<boss@example.com>", "<me@example.com>"])
+        self.assertTrue(all(len(r["to"]) == 1 for r in self.smtp.received))  # nobody sees the other
+
+    def test_resending_same_screenshot_does_not_email_twice(self):
+        rid = self.request()
+        for _ in range(2):
+            self.assertEqual(self.post({"requests": str(rid), "file": ("cat.png", PNG)})[0], 200)
+        self.assertEqual(len(self.smtp.received), 1)
+
+    def test_manual_trigger_only_to_trusted(self):
+        def trig(to):
+            req = urllib.request.Request(self.url + "/trigger", data=json.dumps({"to": to}).encode(),
+                                         method="POST", headers={"Content-Type": "application/json"})
+            try:
+                with urllib.request.urlopen(req, timeout=10) as r:
+                    return r.status
+            except urllib.error.HTTPError as e:
+                return e.code
+        self.assertEqual(trig("stranger@evil.com"), 403)
+        self.assertEqual(trig(""), 403)
+        self.assertEqual(trig("BOSS@example.com"), 200)
+        self.assertEqual(self.api.trigger.requests[self.api.trigger.seq]["to"], "boss@example.com")
 
     def test_no_auth_required(self):
         status, _ = self.post({"file": ("x.jpg", JPEG)})
@@ -143,8 +219,12 @@ class ClientTest(Base):
         self.captures = getattr(self, "captures", 0) + 1
         return PNG, "screenshot_test.png"
 
+    def run_client(self, url=None, retries=3):
+        return client.run_once(url or self.url, retries=retries, capture=self.fake_capture,
+                               requests=[self.request()], client_name="pc1")
+
     def test_client_sends_and_verifies(self):
-        self.assertTrue(client.run_once(self.url, retries=3, capture=self.fake_capture))
+        self.assertTrue(self.run_client())
         self.assertEqual(len(self.smtp.received), 1)
         self.assertEqual(self.emailed_attachment().get_content(), PNG)
 
@@ -153,18 +233,24 @@ class ClientTest(Base):
         # request 2 fails on its first SMTP try and then succeeds on its own retry.
         self.smtp.fail_next = 4
         with mock.patch("client.post_image", wraps=client.post_image) as posts:
-            self.assertTrue(client.run_once(self.url, retries=5, capture=self.fake_capture))
+            self.assertTrue(self.run_client(retries=5))
         self.assertEqual(posts.call_count, 2)         # first POST got 502, second succeeded
         self.assertEqual(len(self.smtp.received), 1)  # exactly one email, no duplicates
         self.assertEqual(self.captures, 1)            # same screenshot resent, not a new one
 
     def test_client_gives_up_after_retries(self):
         self.smtp.fail_next = 999
-        self.assertFalse(client.run_once(self.url, retries=3, capture=self.fake_capture))
+        self.assertFalse(self.run_client(retries=3))
         self.assertEqual(self.smtp.received, [])
 
+    def test_client_stops_on_permanent_error(self):
+        with mock.patch("client.post_image", wraps=client.post_image) as posts:
+            ok = client.run_once(self.url, retries=5, capture=self.fake_capture, requests=[12345])
+        self.assertFalse(ok)
+        self.assertEqual(posts.call_count, 1)  # 400 = request unknown; resending can't help
+
     def test_client_retries_when_server_down(self):
-        self.assertFalse(client.run_once("http://127.0.0.1:1", retries=2, capture=self.fake_capture))
+        self.assertFalse(self.run_client("http://127.0.0.1:1", retries=2))
         self.assertEqual(self.sleeps.call_count, 1)
 
     def test_client_rejects_wrong_checksum(self):
@@ -184,8 +270,7 @@ class ClientTest(Base):
         liar = ThreadingHTTPServer(("127.0.0.1", 0), Liar)
         threading.Thread(target=liar.serve_forever, daemon=True).start()
         try:
-            ok = client.run_once(f"http://127.0.0.1:{liar.server_address[1]}", retries=2,
-                                 capture=self.fake_capture)
+            ok = self.run_client(f"http://127.0.0.1:{liar.server_address[1]}", retries=2)
         finally:
             liar.shutdown()
             liar.server_close()

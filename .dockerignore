@@ -1,3 +1,6 @@
 *
 !sendfile.py
 !server.py
+!watcher.py
+!settings.py
+!ui.html

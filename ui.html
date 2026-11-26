@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capture &amp; Mail</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1c1f24; --muted: #646b75; --border: #dde1e6;
+    --accent: #2563eb; --accent-text: #ffffff; --ok: #15803d; --warn: #b45309; --bad: #b91c1c;
+    --ok-bg: #e8f5ec; --warn-bg: #fdf3e2; --bad-bg: #fdecec; --input: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111316; --card: #1a1d21; --text: #e7e9ec; --muted: #9aa1ab; --border: #2c3138;
+      --accent: #4f8cff; --accent-text: #0b1220; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
+      --ok-bg: #12291b; --warn-bg: #2d2412; --bad-bg: #321617; --input: #14171a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  h1 { font-size: 22px; margin: 0; }
+  h2 { font-size: 15px; margin: 0 0 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+          font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .ok { color: var(--ok); background: var(--ok-bg); }
+  .warn { color: var(--warn); background: var(--warn-bg); }
+  .bad { color: var(--bad); background: var(--bad-bg); }
+  .banner { padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; font-size: 14px; }
+  .grid { display: grid; grid-template-columns: 160px 1fr; gap: 8px 16px; font-size: 14px; }
+  .grid dt { color: var(--muted); }
+  .grid dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .clients { list-style: none; padding: 0; margin: 0; }
+  .clients li { display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .field { margin-bottom: 14px; }
+  .help { color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .help a { color: var(--accent); }
+  .err { color: var(--bad); font-size: 13px; margin-top: 3px; }
+  input, select { width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px;
+                  background: var(--input); color: var(--text); font: inherit; }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+  input.invalid { border-color: var(--bad); }
+  button { font: inherit; font-weight: 600; padding: 9px 14px; border-radius: 8px; cursor: pointer;
+           border: 1px solid var(--border); background: var(--card); color: var(--text); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button:disabled { opacity: .6; cursor: progress; }
+  details summary { cursor: pointer; color: var(--muted); font-weight: 600; margin-bottom: 12px; }
+  .save-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: calc(100% - 32px);
+           padding: 10px 16px; border-radius: 10px; font-size: 14px; display: none; box-shadow: 0 4px 16px rgba(0,0,0,.15); }
+  .pw-wrap { display: flex; gap: 6px; }
+  .pw-wrap input { flex: 1; }
+  @media (max-width: 560px) { .grid { grid-template-columns: 1fr; gap: 2px; } .grid dd { margin-bottom: 8px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Capture &amp; Mail</h1>
+    <span id="overall" class="pill warn">Loading…</span>
+  </header>
+
+  <div id="banner"></div>
+
+  <section class="card">
+    <h2>Status</h2>
+    <dl class="grid">
+      <dt>Inbox watcher</dt><dd id="s-watcher">…</dd>
+      <dt>Clients</dt><dd id="s-clients">…</dd>
+      <dt>Trusted senders</dt><dd id="s-trusted">…</dd>
+      <dt>Last request</dt><dd id="s-trigger">…</dd>
+      <dt>Last screenshot</dt><dd id="s-sent">…</dd>
+    </dl>
+    <div class="actions">
+      <button id="btn-login">Test Gmail login</button>
+    </div>
+    <div class="actions" style="align-items:center">
+      <label for="to-select" style="margin:0;font-weight:500">Send to</label>
+      <select id="to-select" style="width:auto;min-width:200px;flex:1"></select>
+      <button id="btn-capture">Take screenshot now</button>
+      <button id="btn-email">Send test email</button>
+    </div>
+    <div class="help">Screenshots only go to trusted senders: whoever emailed the request, or the address picked here.</div>
+  </section>
+
+  <form id="form" class="card" novalidate>
+    <div id="fields"></div>
+    <div class="save-row">
+      <button type="submit" class="primary" id="btn-save">Save settings</button>
+      <span class="help">Saving applies immediately, with no restart needed.</span>
+    </div>
+  </form>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+let fields = [];
+
+function ago(t, now) {
+  if (!t) return "never";
+  const s = Math.max(0, Math.round((now || Date.now() / 1000) - t));
+  if (s < 60) return s + "s ago";
+  if (s < 3600) return Math.round(s / 60) + " min ago";
+  if (s < 86400) return Math.round(s / 3600) + " h ago";
+  return new Date(t * 1000).toLocaleString();
+}
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function pill(cls, text) { return `<span class="pill ${cls}">${esc(text)}</span>`; }
+
+function toast(msg, ok) {
+  const t = $("#toast");
+  t.className = ok ? "ok" : "bad";
+  t.textContent = msg;
+  t.style.display = "block";
+  clearTimeout(toast.h);
+  toast.h = setTimeout(() => (t.style.display = "none"), ok ? 4000 : 8000);
+}
+
+async function api(path, body) {
+  const opts = body === undefined ? {} : { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) };
+  const r = await fetch(path, opts);
+  let data = {};
+  try { data = await r.json(); } catch (e) {}
+  return { status: r.status, ...data };
+}
+
+function renderFields(values) {
+  const groups = {};
+  for (const f of fields) (groups[f.group] ||= []).push(f);
+  let html = "";
+  for (const [g, list] of Object.entries(groups)) {
+    const inner = list.map(f => {
+      const id = "f-" + f.key;
+      let input;
+      if (f.choices) {
+        input = `<select id="${id}" name="${f.key}">` +
+          f.choices.map(c => `<option${values[f.key] === c ? " selected" : ""}>${esc(c)}</option>`).join("") + `</select>`;
+      } else if (f.secret) {
+        const ph = values[f.key + "_set"] ? "•••••••••••••••• (saved, leave empty to keep)" : "16-character App Password";
+        input = `<div class="pw-wrap"><input id="${id}" name="${f.key}" type="password" autocomplete="new-password" placeholder="${esc(ph)}">` +
+                `<button type="button" data-toggle="${id}">Show</button></div>`;
+      } else {
+        const type = f.type === "number" ? "number" : (f.type === "email" ? "email" : "text");
+        input = `<input id="${id}" name="${f.key}" type="${type}" value="${esc(values[f.key])}" autocomplete="off">`;
+      }
+      return `<div class="field"><label for="${id}">${esc(f.label)}${f.required ? "" : ' <span class="help">(optional)</span>'}</label>` +
+             input + (f.help ? `<div class="help">${f.help}</div>` : "") + `<div class="err" id="e-${f.key}"></div></div>`;
+    }).join("");
+    html += g === "Advanced"
+      ? `<details><summary>Advanced (other providers than Gmail)</summary>${inner}</details>`
+      : `<h2>${esc(g)}</h2>${inner}`;
+  }
+  $("#fields").innerHTML = html;
+  document.querySelectorAll("[data-toggle]").forEach(b => b.onclick = () => {
+    const i = document.getElementById(b.dataset.toggle);
+    i.type = i.type === "password" ? "text" : "password";
+    b.textContent = i.type === "password" ? "Show" : "Hide";
+  });
+}
+
+function renderStatus(s, protectedUi) {
+  const now = s.now;
+  const w = s.watcher;
+  let overall;
+  if (!s.configured) {
+    $("#s-watcher").innerHTML = pill("warn", "Not configured") + ` <span class="help">${esc(s.config_error)}</span>`;
+    overall = ["warn", "Setup needed"];
+  } else if (!s.watch_enabled) {
+    $("#s-watcher").innerHTML = pill("warn", "Disabled (WATCH_EMAIL=false)");
+    overall = ["warn", "Watcher off"];
+  } else if (!w || w.state === "starting") {
+    $("#s-watcher").innerHTML = pill("warn", "Connecting…");
+    overall = ["warn", "Connecting"];
+  } else if (w.state === "watching") {
+    $("#s-watcher").innerHTML = pill("ok", "Watching") +
+      ` <span class="help">${esc(w.user)} for subject “${esc(w.subject)}”, checked ${ago(w.last_check, now)}</span>`;
+    overall = ["ok", "Running"];
+  } else {
+    $("#s-watcher").innerHTML = pill("bad", "Error") + ` <span class="help">${esc(w.error)}</span>`;
+    overall = ["bad", "Inbox error"];
+  }
+  const online = s.clients.filter(c => c.online);
+  $("#s-clients").innerHTML = s.clients.length
+    ? `<ul class="clients">` + s.clients.map(c =>
+        `<li><span class="dot" style="background:var(--${c.online ? "ok" : "muted"})"></span>${esc(c.name)}` +
+        ` <span class="help">${c.online ? "online" : "last seen " + ago(c.last_seen, now)}</span></li>`).join("") + `</ul>`
+    : `<span class="help">No client has connected yet. Run client.py on the PC.</span>`;
+  if (overall[0] === "ok" && !online.length) overall = ["warn", "No client online"];
+  const t = s.last_trigger;
+  $("#s-trigger").textContent = t ? `#${t.seq} ${ago(t.time, now)} (${t.reason})` : "none yet";
+  $("#s-trusted").innerHTML = s.trusted.length ? esc(s.trusted.join(", "))
+    : pill("bad", "None") + ` <span class="help">Every request is ignored until you add one below.</span>`;
+  if (overall[0] === "ok" && !s.trusted.length) overall = ["warn", "No trusted senders"];
+  const sel = $("#to-select"), keep = sel.value;
+  const opts = s.trusted.map(a => `<option${a === keep ? " selected" : ""}>${esc(a)}</option>`).join("");
+  if (sel.dataset.opts !== opts) { sel.innerHTML = opts || "<option value=''>(add a trusted sender first)</option>"; sel.dataset.opts = opts; }
+  const sent = s.last_sent;
+  $("#s-sent").textContent = sent ? `${sent.filename}, ${Math.round(sent.bytes / 1024)} KB to ${sent.to.join(", ")}, ${ago(sent.time, now)}` : "none yet";
+  const o = $("#overall"); o.className = "pill " + overall[0]; o.textContent = overall[1];
+  $("#banner").innerHTML = protectedUi ? "" :
+    `<div class="banner warn">This page has no password. Anyone on your network can open it and change where screenshots go. Set <code>ADMIN_PASSWORD</code> in <code>.env</code> and restart the server to protect it.</div>`;
+}
+
+let protectedUi = true;
+async function load() {
+  const d = await api("/api/settings");
+  if (!d.ok) { toast(d.error || "Could not load settings", false); return; }
+  fields = d.fields; protectedUi = d.protected;
+  renderFields(d.values);
+  renderStatus(d.status, protectedUi);
+}
+async function refresh() {
+  const d = await api("/api/status");
+  if (d.ok) renderStatus(d.status, protectedUi);
+}
+
+$("#form").onsubmit = async (e) => {
+  e.preventDefault();
+  const values = {};
+  for (const f of fields) values[f.key] = document.getElementById("f-" + f.key).value;
+  document.querySelectorAll(".err").forEach(x => (x.textContent = ""));
+  document.querySelectorAll("input.invalid").forEach(x => x.classList.remove("invalid"));
+  const btn = $("#btn-save"); btn.disabled = true;
+  try {
+    const d = await api("/api/settings", { values });
+    if (d.ok) {
+      renderFields(d.values); renderStatus(d.status, protectedUi);
+      toast("Saved. Checking the Gmail login…", true);
+      setTimeout(testLogin, 300);
+    } else if (d.errors) {
+      let first;
+      for (const [k, msg] of Object.entries(d.errors)) {
+        const el = document.getElementById("f-" + k);
+        document.getElementById("e-" + k).textContent = msg;
+        if (el) { el.classList.add("invalid"); first ||= el; }
+      }
+      if (first) { first.closest("details")?.setAttribute("open", ""); first.focus(); }
+      toast("Please fix the highlighted fields.", false);
+    } else toast(d.error || "Save failed", false);
+  } finally { btn.disabled = false; }
+};
+
+async function withButton(btn, fn) { btn.disabled = true; try { await fn(); } finally { btn.disabled = false; } }
+
+async function testLogin() {
+  await withButton($("#btn-login"), async () => {
+    const smtp = await api("/api/test", { what: "smtp" });
+    if (!smtp.ok) return toast("Sending (SMTP): " + smtp.error, false);
+    const imap = await api("/api/test", { what: "imap" });
+    if (!imap.ok) return toast("Reading inbox (IMAP): " + imap.error, false);
+    toast("Gmail login works for both sending and reading the inbox.", true);
+  });
+}
+$("#btn-login").onclick = testLogin;
+$("#btn-email").onclick = () => withButton($("#btn-email"), async () => {
+  const d = await api("/api/test", { what: "email", to: $("#to-select").value });
+  toast(d.ok ? d.message : d.error, d.ok);
+});
+$("#btn-capture").onclick = () => withButton($("#btn-capture"), async () => {
+  const to = $("#to-select").value;
+  const d = await api("/trigger", { to });
+  if (!d.ok) return toast(d.error || "Could not request a screenshot", false);
+  const s = await api("/api/status");
+  const online = s.ok ? s.status.clients.filter(c => c.online).length : 0;
+  toast(online ? `Screenshot requested from ${online} client(s). It will be emailed to ${to} shortly.`
+               : "Requested, but no client is online right now.", online > 0);
+  setTimeout(refresh, 3000);
+});
+
+load();
+setInterval(refresh, 4000);
+</script>
+</body>
+</html>
