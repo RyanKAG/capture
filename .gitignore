@@ -1,0 +1,11 @@
+__pycache__/
+.venv/
+screenshot-test-*/
+config.ini
+.DS_Store
+/windows-outlook-setup/
+/windows-outlook-setup.zip
+/windows-test-results/
+/mac-test-preview.png
+/window-screenshot-email.zip
+*.eml
