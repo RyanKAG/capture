@@ -1,0 +1,10 @@
+services:
+  sendfile:
+    build: .
+    env_file: .env
+    environment:
+      PORT: "8989"          # inside the container
+    ports:
+      - "8989:8989"         # reachable from other machines on port 8989
+    restart: unless-stopped
+    read_only: true         # nothing can be written to disk; images are only held in memory
