@@ -6,7 +6,7 @@ Email a PNG of one application window at a regular interval or at chosen times o
 
 [Download CaptureMail.exe for Windows](https://raw.githubusercontent.com/RyanKAG/capture/main/downloads/CaptureMail.exe). Double-click it on Windows 11, or Windows 10 version 1903 or later with .NET Framework 4.8. The app sends through Microsoft Graph. You can use a personal Hotmail or Outlook.com sender and a Gmail recipient.
 
-1. Click **Sign in** and choose your sending account in Microsoft's sign-in window. On first use, the app downloads Microsoft's sign-in component. Review the permission to send mail.
+1. Click **Sign in** and choose your sending account in Microsoft's sign-in window. On first use, the app downloads Microsoft's 7.7 MB authentication component. It requests permission to identify your account and send mail. [Microsoft Graph authentication component](https://www.powershellgallery.com/packages/Microsoft.Graph.Authentication/2.41.2)
 2. Open the window you want to capture. Choose it from **Window** (click **Refresh** if needed), then click **Preview** to check the image.
 3. Enter the recipient under **Send to** and click **Send test**. Open the PNG in the recipient's inbox to verify delivery.
 4. Choose **Every** for an interval in minutes or **Daily at** for local times such as `09:00, 17:30`. Click **Start schedule**. Interval mode sends the first capture immediately. Leave the app open and Windows awake and unlocked. **Stop schedule** pauses future captures.

@@ -67,6 +67,10 @@ try {
     $check = $mail.GetMethod('CheckSdkAsync', $flags).Invoke($null, @())
     if (!$check.Wait(240000)) { throw 'Microsoft Graph SDK preparation timed out.' }
     Write-Output "Microsoft Graph authentication module imported: $($check.Result)"
+} catch {
+    $detail = $_.Exception.GetBaseException().Message
+    Write-Output ("::error::" + $detail.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A'))
+    throw
 } finally {
     foreach ($process in @($fixture, $app)) {
         if ($process) {

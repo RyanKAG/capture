@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
-using System.Linq;
 using System.Net.Http;
 using System.Net.Mail;
 using System.Security.Cryptography;
@@ -217,7 +216,9 @@ try {
             if (!IsExpectedPackage(archive)) {
                 string temp = archive + "." + Guid.NewGuid().ToString("N") + ".tmp";
                 try {
-                    using (var http = new HttpClient { Timeout = TimeSpan.FromMinutes(3) }) {
+                    using (var http = new HttpClient {
+                        Timeout = TimeSpan.FromMinutes(3), MaxResponseContentBufferSize = PackageSize
+                    }) {
                         var bytes = await http.GetByteArrayAsync("https://cdn.powershellgallery.com/packages/microsoft.graph.authentication." + Version + ".nupkg").ConfigureAwait(false);
                         if (bytes.Length != PackageSize) throw new InvalidDataException("The Microsoft Graph download was incomplete.");
                         File.WriteAllBytes(temp, bytes);
