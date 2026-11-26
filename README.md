@@ -2,7 +2,18 @@
 
 Email a PNG of one application window at a regular interval or at chosen times of day. Run the script in the desktop session where the window is open.
 
-**Using Windows and classic Outlook?** Start with the [Windows setup and verification guide](WINDOWS.md). It walks you through checking the window preview, sending one email to your recipient, and verifying two scheduled captures. The same guide is included in the [Windows setup ZIP](https://raw.githubusercontent.com/RyanKAG/capture/main/downloads/windows-outlook-setup.zip).
+## Windows app for Hotmail or Outlook.com
+
+[Download CaptureMail.exe for Windows](https://raw.githubusercontent.com/RyanKAG/capture/main/downloads/CaptureMail.exe). Double-click it on Windows 11, or Windows 10 version 1903 or later with .NET Framework 4.8. The app sends through Microsoft Graph. You can use a personal Hotmail or Outlook.com sender and a Gmail recipient.
+
+1. Click **Sign in** and choose your sending account in Microsoft's sign-in window. On first use, the app downloads Microsoft's sign-in component. Review the permission to send mail.
+2. Open the window you want to capture. Choose it from **Window** (click **Refresh** if needed), then click **Preview** to check the image.
+3. Enter the recipient under **Send to** and click **Send test**. Open the PNG in the recipient's inbox to verify delivery.
+4. Choose **Every** for an interval in minutes or **Daily at** for local times such as `09:00, 17:30`. Click **Start schedule**. Interval mode sends the first capture immediately. Leave the app open and Windows awake and unlocked. **Stop schedule** pauses future captures.
+
+The app remembers your recipient and schedule on this PC. Keep the selected window open and unminimized. If it closes or its title changes, stop the schedule, refresh the list and select it again. If Microsoft accepts a submission but you cannot find the email, check the sender's Sent Items and the recipient's Spam folder before sending another test.
+
+For the Python version that sends through an installed copy of **classic Outlook**, see the [classic Outlook setup guide](WINDOWS.md).
 
 ## Test the schedule on this Mac
 
@@ -33,7 +44,7 @@ python3.13 -m venv .venv
 
 If macOS asks, enable Terminal under **System Settings → Privacy & Security → Screen & System Audio Recording**, then reopen Terminal and rerun the command. Keep the target window open on the current desktop.
 
-## Set up on Windows
+## Set up the Python script on Windows
 
 Use x64 Python on Windows 11 or Windows 10 version 1903 or later. The commands below assume the Windows Python launcher (`py`) selects Python 3.12 or 3.13. [Windows capture API requirements](https://learn.microsoft.com/en-us/windows/win32/api/windows.graphics.capture.interop/nf-windows-graphics-capture-interop-igraphicscaptureiteminterop-createforwindow) · [Capture package for x64 Python](https://pypi.org/project/windows-capture/2.0.1/)
 

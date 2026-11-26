@@ -9,3 +9,5 @@ config.ini
 /mac-test-preview.png
 /window-screenshot-email.zip
 *.eml
+/desktop/bin/
+/desktop/obj/
